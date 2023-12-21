@@ -4,6 +4,7 @@
 
 import express, { Express, Request, Response } from 'express';
 require('dotenv').config();
+const bodyParser = require('body-parser');
 const mysql = require('mysql2');
 const cors = require('cors');
 const app:Express = express();
@@ -13,8 +14,10 @@ app.use(cors({
     origin: true,
     credentials: true,
 }));
+app.use(bodyParser.json()) // parse application/json
+app.use(bodyParser.urlencoded({extended: false}))
 
-//-- sign up start
+//--> sign up start
 app.get(`/id/check`, (req:Request, res:Response) => {       // id 중복 체크
     const {userID} = req.query; 
     const connection = mysql.createConnection(process.env.DATABASE_URL);
@@ -29,8 +32,8 @@ app.get(`/id/check`, (req:Request, res:Response) => {       // id 중복 체크
     connection.end();
 });
 
-app.post(`/user`, (req:Request, res:Response) => {          // 회원 가입
-    const {userID, userPassword} = req.query;
+app.post(`/signUp`, (req:Request, res:Response) => {          // 회원 가입
+    const {userID, userPassword} = req.body.params;
     const sqlCreateUser = `INSERT INTO User (user_id, user_password) VALUES ('${userID}', '${userPassword}');`;
     const connection = mysql.createConnection(process.env.DATABASE_URL)
     connection.query(sqlCreateUser, (err: any, result: any) => {});
@@ -38,14 +41,24 @@ app.post(`/user`, (req:Request, res:Response) => {          // 회원 가입
     res.status(200);
     res.end();
 });
-//-- sign up end
+//--< sign up end
 
 
-//-- sign in start
- 
+//--> sign in start
+ app.post(`/signIn`, (req:Request, res:Response) => {          // 회원 로그인
+    const {userID, userPassword} = req.body.params;
+    const sqlCreateUser = `SELECT * FROM User WHERE user_id = '${userID}' AND user_password = '${userPassword}';`;
+    const connection = mysql.createConnection(process.env.DATABASE_URL);
+    let loginPossible = false;
 
-
-//-- sign in end
+    connection.query(sqlCreateUser, (err: any, result: any) => {
+        loginPossible = result.length > 0;
+        res.send(loginPossible);
+        res.end();
+    });
+    connection.end();
+});
+//--< sign in end
 
 
 app.get(`/`, (req: Request, res: Response) => {
