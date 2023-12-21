@@ -11,7 +11,7 @@ const RoomsPage = () => {
                     <article>
                         <div className="roomNumberBox">
                             <p>방 번호:</p>
-                            <p>2</p>
+                            <p>1</p>
                         </div>
                         <div id="chattingWrapBox">
                         </div>
@@ -45,7 +45,7 @@ const RoomsPage = () => {
                     </div>
                     <div className="roomNumberBox">
                         <p>방 번호: </p>
-                        <p>2</p>
+                        <p>1</p>
                     </div>
                     <div className="buttonBox">
                         <button onClick={() => setChattingModal("displayFlag")}>입장</button>
