@@ -6,7 +6,7 @@
   "scripts": {
     "build": "npx tsc",
     "start": "nodemon webChatting.js",
-    "dev": "concurrently \"npx tsc --watch && nodemon -q webChatting.js\""
+    "dev": "concurrently \"npx tsc --watch & npm run start\""
   },
   "author": "",
   "license": "ISC",
