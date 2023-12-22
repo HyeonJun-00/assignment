@@ -1,6 +1,7 @@
 import './sass/FriendsPage.scss';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import $ from "jquery";
 
 const AddFriendInboxList = (props:any) => {
     const {userList, flags, userNo, setUserListFlag} = props;
@@ -68,7 +69,7 @@ const AddFriendInboxList = (props:any) => {
 }
 
 const FriendsList = (props: any) => {
-    const { setOnChatting, friendsList, setUserListFlag, userNo } = props;
+    const { setOnChatting, friendsList, setUserListFlag, userNo, setFriend, setFriendName, ws, nowFriend } = props;
     const deleteFriend = async (userOneNo:number, userTwoNo:number) => {
         try {
             const response = await axios.delete('http://kkms4001.iptime.org:10098/friend', {
@@ -86,6 +87,10 @@ const FriendsList = (props: any) => {
             console.error(e);
         }
     };
+    const submitChatting = (reNo:number) => {
+        const submitData = {type:"friendChatOpen", sender:userNo, recipient:reNo, time:new Date()};
+        ws.send(JSON.stringify(submitData));
+    };
 
     const makeUserBox = friendsList.map((v:{no:number, id:string, creationDate:string}) => {
         const creationDate = new Date(v.creationDate);
@@ -101,7 +106,7 @@ const FriendsList = (props: any) => {
                 </div>
                 <div className="buttonBox">
                     <button onClick={() => deleteFriend(userNo, v.no)} >친구 삭제</button>
-                    <button onClick={() => setOnChatting(true)}>DM</button>
+                    <button onClick={() => {submitChatting(v.no); setOnChatting(true); setFriend(v.no); setFriendName(v.id);}}>DM</button>
                 </div>
             </div>
         )
@@ -115,35 +120,54 @@ const FriendsList = (props: any) => {
 }
 
 const ChattingModal = (props:any) => {
-    const { setOnChatting } = props;
-    
+    const { setOnChatting, nowFriend, nowFriendName, ws, chatting, userNo} = props;
+    const [chatList, setChatList] = chatting;
+    const [submitText, setSubmitText] = useState("");
+
+    const submitChatting = () => {
+        const submitData = {type:"friendChat", sender:userNo, recipient:nowFriend, text:submitText, time:new Date()};
+        ws.send(JSON.stringify(submitData));
+        setSubmitText("");
+    };
+
+    useEffect(() => {
+        const scrollToBottom = $(".chattingBottomBox")[0].scrollHeight;
+        $(".chattingBottomBox").scrollTop(scrollToBottom === undefined ? 0 : scrollToBottom);
+    }, [chatList]);
+
     return (
         <div className='ChattingModal'>
             <section>
                 <article className='chattingArticle'>
                     <div className='chattingTopBox'>
-                        <p>짜장면</p>
+                        <p>{nowFriendName}</p>
                         <button onClick={() => setOnChatting(false)}>나가기</button>
                     </div>
                     <div className='chattingBottomBox'>
-                        <div className='myChat'>
-                            <p className='text'> 머하고 있어??</p>
-                            <p className='time'>15:11</p>
-                        </div>
-                        <div className='chat'>
-                            <p className='userID'>짜장면</p>
-                            <p className='text'> 1번 채팅방에 있음 ㅋㅋ</p>
-                            <p className='time'>15:12</p>
-                        </div>
-                        <div className='myChat'>
-                            <p className='text'>ㅇㅋ 걸로갈게</p>
-                            <p className='time'>15:14</p>
-                        </div>
+                        {chatList.map((chat:any) => {
+                            if (chat.type === "friendChatOpen") { return ;}
+                            if (chat.sender === userNo) {
+                                return <div className='myChat' key={Math.random()}>
+                                    <p className='text'>{chat.text}</p>
+                                    <p className='time'>{`${("0"+new Date(chat.time).getHours()).slice(-2)}:${
+                                        ("0"+new Date(chat.time).getMinutes()).slice(-2)}`}</p>
+                                </div>
+                            } else if (chat.recipient === userNo) {
+                                return <div className='chat' key={Math.random()}>
+                                    <p className='userID'>{nowFriendName}</p>
+                                    <p className='text'>{chat.text}</p>
+                                    <p className='time'>{`${("0"+new Date(chat.time).getHours()).slice(-2)}:${
+                                        ("0"+new Date(chat.time).getMinutes()).slice(-2)}`}</p>
+                                </div>
+                            }
+                        })}
+
                     </div>
                 </article>
                 <article className='submitArticle'>
-                    <textarea id="submitText" placeholder="채팅 내용을 입력해 주세요."></textarea>
-                    <button id="submitButton">전송</button>
+                    <textarea id="submitText" onChange={(e) => setSubmitText(e.target.value)}
+                    placeholder="채팅 내용을 입력해 주세요." value={submitText}></textarea>
+                    <button id="submitButton" onClick={submitChatting}>전송</button>
                 </article>
             </section>
         </div>
@@ -151,13 +175,14 @@ const ChattingModal = (props:any) => {
 }
 
 const FriendsPage = (props:any) => {
-    const {userNo} = props;
+    const {userNo, ws, chatting} = props;
     const [userListFlag, setUserListFlag] = useState(Math.random());
     const [onChatting, setOnChatting] = useState(false);
     const [selectFlag, setSelectFlag] = useState("addFriendInbox");
-    const [userList, setUserList] = useState<{id:string, creationDate:string}[]>([]);
-    const [friendsList, setFriendsList] = useState<{id:string, creationDate:string}[]>([]);
-    const friendChatting = onChatting ? <ChattingModal setOnChatting={setOnChatting}/> : <></>;
+    const [nowFriend, setFriend] = useState(0);
+    const [nowFriendName, setFriendName] = useState("");
+    const [userList, setUserList] = useState<{no:number, id:string, creationDate:string}[]>([]);
+    const [friendsList, setFriendsList] = useState<{no:number, id:string, creationDate:string}[]>([]);
 
     useEffect(() => {
             (async () => {
@@ -202,10 +227,10 @@ const FriendsPage = (props:any) => {
                         }}>목록</button>
             </div>
             {selectFlag === "addFriendInbox" ? 
-            <AddFriendInboxList userNo={userNo} setUserListFlag={setUserListFlag} userList={userList}/> :
-            <FriendsList userNo={userNo} setUserListFlag={setUserListFlag} friendsList={friendsList} setOnChatting={setOnChatting}/>
+                <AddFriendInboxList userNo={userNo} setUserListFlag={setUserListFlag} userList={userList}/> :
+                <FriendsList ws={ws} nowFriend={nowFriend} setFriendName={setFriendName} setFriend={setFriend} userNo={userNo} setUserListFlag={setUserListFlag} friendsList={friendsList} setOnChatting={setOnChatting}/>
             }
-            {friendChatting}
+            {onChatting ? <ChattingModal userNo={userNo} ws={ws} chatting={chatting} nowFriend={nowFriend} nowFriendName={nowFriendName} setOnChatting={setOnChatting}/> : <></>}
         </div>
   );
 }

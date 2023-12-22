@@ -35,6 +35,7 @@ const RoomChattingModal = (props:any) => {
                     </div>
                     <div id="chattingWrapBox">
                         {chatList.map((v:any) => {
+                            if (v.type === "friendChat") return <p key={Math.random()}></p>;
                             if (v.type === 'userIn') {
                                 return <div className='userIn' key={Math.random()}>
                                     <p className='userID'>{v.user}</p>
@@ -46,13 +47,13 @@ const RoomChattingModal = (props:any) => {
                             } else if (v.type === "chat" && v.data.user === userID) {
                                 return <div className='myChat' key={Math.random()}>
                                     <p className='text'>{v.data.chat}</p>
-                                    <p className='time'>15:11</p>
+                                    <p className='time'>{`${new Date(v.data.time).getHours()}:${new Date(v.data.time).getMinutes()}`}</p>
                                 </div>
                             } else {
                                 return <div className='chat' key={Math.random()}>
-                                    <p className='userID'>{v.user}</p>
+                                    <p className='userID'>{v.data.user}</p>
                                     <p className='text'> {v.data.chat}</p>
-                                    <p className='time'>15:12</p>
+                                    <p className='time'>{`${new Date(v.data.time).getHours()}:${new Date(v.data.time).getMinutes()}`}</p>
                                 </div>
                             }
                         })}
@@ -88,8 +89,8 @@ const RoomChattingModal = (props:any) => {
 }
 
 const RoomsPage = (props:any) => {
-    const {numberParticipants, ws, userID, userList, chatting} = props;
-    const [chattingModal, setChattingModal] = useState("");
+    const {numberParticipants, ws, userID, userList, chatting, chattingModalObj} = props;
+    const [chattingModal, setChattingModal] = chattingModalObj;
     const [nowRoom, setRoom] = useState(1);
 
     const userEntersRoom = (roomNumber:number, ws:WebSocket) => {

@@ -19,12 +19,12 @@ app.use(cors({
     credentials: true,
 }));
 class ChatClass {
-    constructor(initNumber) {
-        this._chattingRoomName = initNumber;
+    constructor(initName) {
+        this._chattingRoomName = initName;
         this._chatSaveList = [];
         this._wsDictionary = {};
     }
-    get roomNumber() {
+    get roomName() {
         return this._chattingRoomName;
     }
     get chatlist() {
@@ -35,10 +35,15 @@ class ChatClass {
     }
     submitChat(chat) {
         this._chatSaveList.push(chat);
-        console.log(JSON.stringify(chat));
         if (this._chatSaveList.length > 100) {
             this._chatSaveList.shift();
         }
+        for (const user in this._wsDictionary) {
+            const chatList = { type: "chatList", data: this._chatSaveList };
+            this._wsDictionary[user].send(JSON.stringify(chatList));
+        }
+    }
+    sendChatList() {
         for (const user in this._wsDictionary) {
             const chatList = { type: "chatList", data: this._chatSaveList };
             this._wsDictionary[user].send(JSON.stringify(chatList));
@@ -60,41 +65,69 @@ class ChatClass {
         this.sendUserList();
     }
 }
+//--> chatting room start
 const chattingRoom = [new ChatClass(1), new ChatClass(2)];
+const friendChat = {};
 const allUser = {};
 wss.on("connection", (ws, req) => {
     const sendPersonnel = () => {
         const personnel = { type: "personnel", data: { room1: chattingRoom[0].users.length, room2: chattingRoom[1].users.length } };
         for (const user in allUser) {
-            console.log(user);
             allUser[user].send(JSON.stringify(personnel));
         }
     };
+    const friendChatRoom = [];
     let userName = "";
     ws.on("message", (message) => {
         const chatData = JSON.parse(message);
-        switch (chatData.type) {
-            case "open":
-                userName = chatData.user;
-                allUser[userName] = ws;
-                sendPersonnel();
-                break;
-            case "userIn":
-                userName = chatData.user;
-                chattingRoom[chatData.room - 1].userIn(chatData.user, ws);
-                chattingRoom[chatData.room - 1].submitChat(chatData);
-                sendPersonnel();
-                break;
-            case "userOut":
-                chattingRoom[chatData.room - 1].userOut(chatData.user);
-                chattingRoom[chatData.room - 1].submitChat(chatData);
-                sendPersonnel();
-                break;
-            case "chat":
-                chattingRoom[chatData.room - 1].submitChat(chatData);
-                break;
-            default:
-                break;
+        console.log(friendChat);
+        if (chatData.type === "friendChatOpen") {
+            const [user1, user2] = [chatData.sender, chatData.recipient].sort((a, b) => a - b);
+            userName = chatData.sender;
+            const friendChatName = `${user1}AND${user2}`;
+            if (friendChat[friendChatName] === undefined) {
+                friendChat[friendChatName] = new ChatClass(friendChatName);
+            }
+            if (!friendChat[friendChatName].users.reduce((bool, user) => bool || user === userName, false)) {
+                friendChatRoom.push(friendChat[friendChatName]);
+                friendChat[friendChatName].userIn(userName, ws);
+            }
+            friendChat[friendChatName].sendChatList();
+        }
+        else if (chatData.type === "friendChat") {
+            const [user1, user2] = [chatData.sender, chatData.recipient].sort((a, b) => a - b);
+            userName = chatData.sender;
+            const friendChatName = `${user1}AND${user2}`;
+            if (friendChat[friendChatName] === undefined) {
+                friendChat[friendChatName] = new ChatClass(friendChatName);
+            }
+            if (!friendChat[friendChatName].users.reduce((bool, user) => bool || user === userName, false)) {
+                friendChatRoom.push(friendChat[friendChatName]);
+                friendChat[friendChatName].userIn(userName, ws);
+            }
+            friendChat[friendChatName].submitChat(chatData);
+        }
+        else {
+            switch (chatData.type) {
+                case "open":
+                    userName = chatData.user;
+                    allUser[userName] = ws;
+                    sendPersonnel();
+                    break;
+                case "userIn":
+                    chattingRoom[chatData.room - 1].userIn(chatData.user, ws);
+                    chattingRoom[chatData.room - 1].submitChat(chatData);
+                    sendPersonnel();
+                    break;
+                case "userOut":
+                    chattingRoom[chatData.room - 1].userOut(chatData.user);
+                    chattingRoom[chatData.room - 1].submitChat(chatData);
+                    sendPersonnel();
+                    break;
+                case "chat":
+                    chattingRoom[chatData.room - 1].submitChat(chatData);
+                    break;
+            }
         }
     });
     ws.addEventListener("close", () => {
@@ -103,16 +136,13 @@ wss.on("connection", (ws, req) => {
                 chat.userOut(userName);
                 chat.submitChat({ type: "userOut", room: i - 1, user: userName });
             });
+            friendChatRoom.forEach((chat) => {
+                chat.userOut(userName);
+            });
             delete allUser[userName];
             sendPersonnel();
         }
     });
-});
-//--> chatting room start
-app.get(`/chatting/room`, (req, res) => {
-    const { roomNumber } = req.query;
-    res.send();
-    res.end();
 });
 //--< chatting room end
 //--> sign up page start
@@ -283,6 +313,23 @@ app.delete(`/friend`, (req, res) => {
     connection.end();
     res.send(true);
     res.end();
+});
+app.get(`/chat`, (req, res) => {
+    const { userNo, friendNo } = req.query;
+    const connection = mysql.createConnection(process.env.DATABASE_URL);
+    const sqlGetFriendList = `
+        SELECT *
+        FROM Chatting
+        WHERE (sender_user_id = 1 AND recipient_user_id = 2)
+           OR (sender_user_id = 2 AND recipient_user_id = 1);
+    `;
+    connection.query(sqlGetFriendList, [userNo, friendNo, friendNo, userNo], (err, result) => {
+        const requestList = result.map((user) => {
+        });
+        res.send(requestList);
+        res.end();
+    });
+    connection.end();
 });
 //--< Friends page end
 app.listen(port, () => {

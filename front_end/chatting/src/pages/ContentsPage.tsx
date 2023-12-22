@@ -2,7 +2,7 @@ import './sass/ContentsPage.scss';
 import RoomsPage from './RoomsPage';
 import UserPage from './UserPage';
 import FriendsPage from './FriendsPage';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 
 
@@ -13,6 +13,8 @@ const ContentsPage = (props: any) => {
   const [ws,] = useState(new WebSocket("ws://kkms4001.iptime.org:10097"));
   const [userList, setUserList] = useState([]);
   const [chatList, setChatList] = useState<any>([]);
+  const [chattingModal, setChattingModal] = useState("");
+  const navigate = useNavigate();
 
   useEffect(() => {
     ws.onopen = () => {
@@ -30,7 +32,6 @@ const ContentsPage = (props: any) => {
           setUserList(chat.data);
           break;
         case "chatList":
-          console.log(chatList);
           setChatList(chat.data);
           break;
       }
@@ -50,24 +51,32 @@ const ContentsPage = (props: any) => {
             }}>Rooms</button>
           <button className={selectFlag === "Users" ? "selectFlag" : ""}
             onClick={() => {
-              setSelectFlag("Users");
+              if (chattingModal === "") {
+                setSelectFlag("Users");
+              }
             }}>Users</button>
           <button className={selectFlag === "Friends" ? "selectFlag" : ""}
             onClick={() => {
-              setSelectFlag("Friends");
+              if (chattingModal === "") {
+                setSelectFlag("Friends");
+              }
             }}>Friends</button>
-          <Link to={"/"} onClick={() => {
-            removeCookie("chattingID");
-            removeCookie("userNo");
-          }}><button>Logout</button></Link>
+          <button onClick={() => {
+            if (chattingModal === "") {
+              navigate("/", { replace: true });
+              removeCookie("chattingID");
+              removeCookie("userNo");
+            }
+          }}>Logout</button>
         </div>
       </article>
       <article id="contentsArticle">
         {
           {
-            "Rooms": <RoomsPage chatting={[chatList, setChatList]} userList={userList} userID={userID} ws={ws} numberParticipants={numberParticipants} />,
+            "Rooms": <RoomsPage chatting={[chatList, setChatList]} userList={userList} userID={userID} 
+              ws={ws} numberParticipants={numberParticipants} chattingModalObj={[chattingModal, setChattingModal]} />,
             "Users": <UserPage userID={userID} userNo={userNo} />,
-            "Friends": <FriendsPage userID={userID} userNo={userNo} />,
+            "Friends": <FriendsPage ws={ws} chatting={[chatList, setChatList]} userID={userID} userNo={userNo} />,
           }[selectFlag]
         }
       </article>
