@@ -24,7 +24,7 @@ const UserListContent = (props: any) => {
     };
     const cancelRequest = async (userOneNo:number, userTwoNo:number) => {
         try {
-            const response = await axios.delete('http://kkms4001.iptime.org:10098/friend', {
+            const response = await axios.delete('http://kkms4001.iptime.org:10098/friend/request', {
                 params: {
                     userOneNo,
                     userTwoNo,
@@ -39,7 +39,6 @@ const UserListContent = (props: any) => {
             console.error(e);
         }
     };
-
 
     return userList.map((user: any) => {
         const creationDate = new Date(user.creation_date);
@@ -114,7 +113,6 @@ const UserPage = (props: any) => {
                 <button className={`${selectFlag === "sortName" ? "selectFlag" : ""} sortName`}
                     onClick={() => {
                         const sortList = userList.sort((a: any, b: any) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-                        console.log(sortList, userList);
                         setUserList(sortList);
                         setSelectFlag("sortName");
                     }}

@@ -48,12 +48,12 @@ app.post(`/signUp`, (req:Request, res:Response) => {          // 회원 가입
 //--> sign in page start
 app.post(`/signIn`, (req:Request, res:Response) => {          // 회원 로그인
     const {userID, userPassword}:any = req.body.params;
-    const sqlCreateUser:string = `SELECT * FROM User WHERE user_id = ? AND user_password = ?;`;
+    const sqlCheckIdPw:string = `SELECT * FROM User WHERE user_id = ? AND user_password = ?;`;
     const connection:Connection = mysql.createConnection(process.env.DATABASE_URL);
     let loginPossible:boolean = false;
     let userNo:number = 0;
 
-    connection.query(sqlCreateUser, [userID, userPassword], (err: any, result: any) => {
+    connection.query(sqlCheckIdPw, [userID, userPassword], (err: any, result: any) => {
         loginPossible = result.length > 0;
         userNo = loginPossible ? result[0].id : 0;
         res.send({loginPossible, userNo});
@@ -70,12 +70,11 @@ app.get(`/users`, (req: Request, res: Response) => {        // 전체 유저와 
     const { userID, userNo }: any = req.query;
     const connection: Connection = mysql.createConnection({ uri: process.env.DATABASE_URL, multipleStatements: true });
     const sqlGetUser: string = `SELECT * FROM User;`;
-    const sqlGetFriend = `SELECT * FROM Friend where acceptance = TRUE;`;
-    const sqlUserFriend = `SELECT * FROM Friend WHERE sender_user_id = ? OR recipient_user_id = ?;`;
+    const sqlGetFriend:string = `SELECT * FROM Friend where acceptance = TRUE;`;
+    const sqlUserFriend:string = `SELECT * FROM Friend WHERE sender_user_id = ? OR recipient_user_id = ?;`;
 
     connection.query(sqlGetUser + sqlGetFriend + sqlUserFriend, [userNo, userNo], (err: any, result: any) => {
-        const userFriend = result[2]
-        console.log(userFriend, userID);
+        const userFriend:any = result[2]
         let userList: any = result[0]
             .filter((user: any) => userID !== user.user_id)
             .map((user: any) => {
@@ -84,9 +83,9 @@ app.get(`/users`, (req: Request, res: Response) => {        // 전체 유저와 
                     return count + (friend.sender_user_id === user.id || friend.recipient_user_id === user.id ? 1 : 0);
                 }, 0);
                 let i = 0;
+
                 while (userFriend.length > i) {
                     const friend = userFriend[i];
-                    console.log(friend);
                     if (friend.sender_user_id === user.id) {
                         userRelationship = friend.acceptance === 1 ? "friend" : "";
                         break ;
@@ -95,7 +94,6 @@ app.get(`/users`, (req: Request, res: Response) => {        // 전체 유저와 
                         userRelationship = friend.acceptance === 1 ? "friend" : "friendRequestReceived";
                         break;
                     }
-
                     i++;
                 }
                 return { no: user.id, id: user.user_id, creation_date: user.user_creation_date, friendsNumber, userRelationship };
@@ -110,25 +108,25 @@ app.get(`/users`, (req: Request, res: Response) => {        // 전체 유저와 
 app.post(`/friend`, (req: Request, res: Response) => {          // 친구 추가
     const {userOneNo, userTwoNo} = req.body.params;
     const connection:Connection = mysql.createConnection(process.env.DATABASE_URL);
-    const sqlGetID:string = `
+    const sqlAddFriend:string = `
         INSERT INTO Friend (sender_user_id, recipient_user_id)
         VALUES (?, ?);`;
 
-    connection.query(sqlGetID,[userOneNo, userTwoNo]);
+    connection.query(sqlAddFriend,[userOneNo, userTwoNo]);
     connection.end();
     res.send(true);
     res.end();
 });
 
-app.delete(`/friend`, (req: Request, res: Response) => {        // 친구 추가 취소
+app.delete(`/friend/request`, (req: Request, res: Response) => { // 친구 추가 취소, 거절
     const {userOneNo, userTwoNo} = req.query;
     const connection: Connection = mysql.createConnection(process.env.DATABASE_URL);
-    const sqlGetID: string = `
+    const sqlDeleteFriend: string = `
         DELETE FROM Friend
         WHERE sender_user_id = ? AND recipient_user_id = ?;
     `;
 
-    connection.query(sqlGetID,[userOneNo, userTwoNo]);
+    connection.query(sqlDeleteFriend,[userOneNo, userTwoNo]);
     connection.end();
     res.send(true);
     res.end();
@@ -141,21 +139,49 @@ app.delete(`/friend`, (req: Request, res: Response) => {        // 친구 추가
 
 //--> Friends page start
 
-app.get(`/friend/request`, (req: Request, res: Response) => {   // 친구 요청 확인
-    const {userOneNo} = req.query;
+app.get(`/friend/request`, (req: Request, res: Response) => {   // 친구 요청 조회
+    const {userNo} = req.query;
     const connection: Connection = mysql.createConnection(process.env.DATABASE_URL);
-    const sqlGetID: string = `
+    const sqlGetFriendRequest: string = `
         SELECT * FROM User
         WHERE id IN (
           SELECT DISTINCT sender_user_id
           FROM Friend
-          WHERE recipient_user_id = ?
+          WHERE recipient_user_id = ? AND acceptance = FALSE
         );
     `;
 
-    connection.query(sqlGetID,[userOneNo], (err: any, result: any) => {
-        console.log(result);
-        res.send(result);
+    connection.query(sqlGetFriendRequest, [userNo], (err: any, result: any) => {
+        const requestList = result.map((user:any) => ({no:user.id, id:user.user_id, creationDate: user.user_creation_date}));
+
+        res.send(requestList);
+        res.end();
+    });
+    connection.end();
+});
+
+app.get(`/friend`, (req: Request, res: Response) => {           // 친구 목록 조회
+    const {userNo} = req.query;
+    const connection: Connection = mysql.createConnection(process.env.DATABASE_URL);
+    const sqlGetFriendList: string = `
+        SELECT * FROM User
+        WHERE id IN (
+          SELECT DISTINCT sender_user_id
+          FROM Friend
+          WHERE recipient_user_id = ? AND acceptance = TRUE
+        
+          UNION
+        
+          SELECT DISTINCT recipient_user_id
+          FROM Friend
+          WHERE sender_user_id = ? AND acceptance = TRUE
+        );
+    `;
+
+    connection.query(sqlGetFriendList, [userNo, userNo], (err: any, result: any) => {
+        const requestList:any = result.map((user:any) => ({no:user.id, id:user.user_id, creationDate: user.user_creation_date}));
+
+        res.send(requestList);
         res.end();
     });
     connection.end();
@@ -164,13 +190,27 @@ app.get(`/friend/request`, (req: Request, res: Response) => {   // 친구 요청
 app.put(`/friend/request`, (req: Request, res: Response) => {   // 친구 요청 수락
     const {userOneNo, userTwoNo} = req.body.params;
     const connection: Connection = mysql.createConnection(process.env.DATABASE_URL);
-    const sqlGetID: string = `
+    const sqlAcceptRequest: string = `
         UPDATE Friend
         SET acceptance = TRUE
         WHERE sender_user_id = ? AND recipient_user_id = ?;
     `;
 
-    connection.query(sqlGetID,[userOneNo, userTwoNo]);
+    connection.query(sqlAcceptRequest,[userOneNo, userTwoNo]);
+    connection.end();
+    res.send(true);
+    res.end();
+});
+
+app.delete(`/friend`, (req: Request, res: Response) => {        // 친구 삭제
+    const {userOneNo, userTwoNo} = req.query;
+    const connection: Connection = mysql.createConnection(process.env.DATABASE_URL);
+    const sqlDeleteFriend: string = `
+        DELETE FROM Friend
+        WHERE (sender_user_id = ? AND recipient_user_id = ?) OR (sender_user_id = ? AND recipient_user_id = ?);
+    `;
+
+    connection.query(sqlDeleteFriend,[userOneNo, userTwoNo, userTwoNo, userOneNo]);
     connection.end();
     res.send(true);
     res.end();
@@ -179,21 +219,6 @@ app.put(`/friend/request`, (req: Request, res: Response) => {   // 친구 요청
 
 //--< Friends page end
 
-
-app.patch(`/`, (req: Request, res:Response) => {
-    res.send("im path");
-    res.end();
-});
-
-app.delete(`/`, (req: Request, res:Response) => {
-    res.send("im delete");
-    res.end();
-});
-
-app.post(`/`, (req: Request, res:Response) => {
-    res.send("im post");
-    res.end();
-});
 
 app.listen( port, () => {
     console.log( `connected ${ port } port!` );

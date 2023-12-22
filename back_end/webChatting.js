@@ -44,11 +44,11 @@ app.post(`/signUp`, (req, res) => {
 //--> sign in page start
 app.post(`/signIn`, (req, res) => {
     const { userID, userPassword } = req.body.params;
-    const sqlCreateUser = `SELECT * FROM User WHERE user_id = ? AND user_password = ?;`;
+    const sqlCheckIdPw = `SELECT * FROM User WHERE user_id = ? AND user_password = ?;`;
     const connection = mysql.createConnection(process.env.DATABASE_URL);
     let loginPossible = false;
     let userNo = 0;
-    connection.query(sqlCreateUser, [userID, userPassword], (err, result) => {
+    connection.query(sqlCheckIdPw, [userID, userPassword], (err, result) => {
         loginPossible = result.length > 0;
         userNo = loginPossible ? result[0].id : 0;
         res.send({ loginPossible, userNo });
@@ -66,7 +66,6 @@ app.get(`/users`, (req, res) => {
     const sqlUserFriend = `SELECT * FROM Friend WHERE sender_user_id = ? OR recipient_user_id = ?;`;
     connection.query(sqlGetUser + sqlGetFriend + sqlUserFriend, [userNo, userNo], (err, result) => {
         const userFriend = result[2];
-        console.log(userFriend, userID);
         let userList = result[0]
             .filter((user) => userID !== user.user_id)
             .map((user) => {
@@ -77,7 +76,6 @@ app.get(`/users`, (req, res) => {
             let i = 0;
             while (userFriend.length > i) {
                 const friend = userFriend[i];
-                console.log(friend);
                 if (friend.sender_user_id === user.id) {
                     userRelationship = friend.acceptance === 1 ? "friend" : "";
                     break;
@@ -98,22 +96,22 @@ app.get(`/users`, (req, res) => {
 app.post(`/friend`, (req, res) => {
     const { userOneNo, userTwoNo } = req.body.params;
     const connection = mysql.createConnection(process.env.DATABASE_URL);
-    const sqlGetID = `
+    const sqlAddFriend = `
         INSERT INTO Friend (sender_user_id, recipient_user_id)
         VALUES (?, ?);`;
-    connection.query(sqlGetID, [userOneNo, userTwoNo]);
+    connection.query(sqlAddFriend, [userOneNo, userTwoNo]);
     connection.end();
     res.send(true);
     res.end();
 });
-app.delete(`/friend`, (req, res) => {
+app.delete(`/friend/request`, (req, res) => {
     const { userOneNo, userTwoNo } = req.query;
     const connection = mysql.createConnection(process.env.DATABASE_URL);
-    const sqlGetID = `
+    const sqlDeleteFriend = `
         DELETE FROM Friend
         WHERE sender_user_id = ? AND recipient_user_id = ?;
     `;
-    connection.query(sqlGetID, [userOneNo, userTwoNo]);
+    connection.query(sqlDeleteFriend, [userOneNo, userTwoNo]);
     connection.end();
     res.send(true);
     res.end();
@@ -121,19 +119,43 @@ app.delete(`/friend`, (req, res) => {
 //--< Users page end
 //--> Friends page start
 app.get(`/friend/request`, (req, res) => {
-    const { userOneNo } = req.query;
+    const { userNo } = req.query;
     const connection = mysql.createConnection(process.env.DATABASE_URL);
-    const sqlGetID = `
+    const sqlGetFriendRequest = `
         SELECT * FROM User
         WHERE id IN (
           SELECT DISTINCT sender_user_id
           FROM Friend
-          WHERE recipient_user_id = ?
+          WHERE recipient_user_id = ? AND acceptance = FALSE
         );
     `;
-    connection.query(sqlGetID, [userOneNo], (err, result) => {
-        console.log(result);
-        res.send(result);
+    connection.query(sqlGetFriendRequest, [userNo], (err, result) => {
+        const requestList = result.map((user) => ({ no: user.id, id: user.user_id, creationDate: user.user_creation_date }));
+        res.send(requestList);
+        res.end();
+    });
+    connection.end();
+});
+app.get(`/friend`, (req, res) => {
+    const { userNo } = req.query;
+    const connection = mysql.createConnection(process.env.DATABASE_URL);
+    const sqlGetFriendList = `
+        SELECT * FROM User
+        WHERE id IN (
+          SELECT DISTINCT sender_user_id
+          FROM Friend
+          WHERE recipient_user_id = ? AND acceptance = TRUE
+        
+          UNION
+        
+          SELECT DISTINCT recipient_user_id
+          FROM Friend
+          WHERE sender_user_id = ? AND acceptance = TRUE
+        );
+    `;
+    connection.query(sqlGetFriendList, [userNo, userNo], (err, result) => {
+        const requestList = result.map((user) => ({ no: user.id, id: user.user_id, creationDate: user.user_creation_date }));
+        res.send(requestList);
         res.end();
     });
     connection.end();
@@ -141,29 +163,29 @@ app.get(`/friend/request`, (req, res) => {
 app.put(`/friend/request`, (req, res) => {
     const { userOneNo, userTwoNo } = req.body.params;
     const connection = mysql.createConnection(process.env.DATABASE_URL);
-    const sqlGetID = `
+    const sqlAcceptRequest = `
         UPDATE Friend
         SET acceptance = TRUE
         WHERE sender_user_id = ? AND recipient_user_id = ?;
     `;
-    connection.query(sqlGetID, [userOneNo, userTwoNo]);
+    connection.query(sqlAcceptRequest, [userOneNo, userTwoNo]);
+    connection.end();
+    res.send(true);
+    res.end();
+});
+app.delete(`/friend`, (req, res) => {
+    const { userOneNo, userTwoNo } = req.query;
+    const connection = mysql.createConnection(process.env.DATABASE_URL);
+    const sqlDeleteFriend = `
+        DELETE FROM Friend
+        WHERE (sender_user_id = ? AND recipient_user_id = ?) OR (sender_user_id = ? AND recipient_user_id = ?);
+    `;
+    connection.query(sqlDeleteFriend, [userOneNo, userTwoNo, userTwoNo, userOneNo]);
     connection.end();
     res.send(true);
     res.end();
 });
 //--< Friends page end
-app.patch(`/`, (req, res) => {
-    res.send("im path");
-    res.end();
-});
-app.delete(`/`, (req, res) => {
-    res.send("im delete");
-    res.end();
-});
-app.post(`/`, (req, res) => {
-    res.send("im post");
-    res.end();
-});
 app.listen(port, () => {
     console.log(`connected ${port} port!`);
 });

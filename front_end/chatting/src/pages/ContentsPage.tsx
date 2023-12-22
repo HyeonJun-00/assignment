@@ -27,7 +27,7 @@ const ContentsPage = (props:any) => {
                     }}>Users</button>
             <button className={selectFlag === "Friends" ? "selectFlag" : ""} 
                     onClick={() => {
-                      setContentPage(<FriendsPage/>);
+                      setContentPage(<FriendsPage userID={userID} userNo={userNo}/>);
                       setSelectFlag("Friends");
                     }}>Friends</button>
             <Link to={"/"} onClick={() => {
