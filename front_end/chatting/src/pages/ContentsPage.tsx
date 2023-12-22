@@ -6,7 +6,8 @@ import { Link } from 'react-router-dom';
 import { useState } from 'react';
 
 
-const ContentsPage = () => {
+const ContentsPage = (props:any) => {
+    const { removeCookie, userID, userNo} = props;
     const [nowContentPage, setContentPage] = useState(<RoomsPage/>);
     const [selectFlag, setSelectFlag] = useState("Rooms");
 
@@ -21,7 +22,7 @@ const ContentsPage = () => {
                     }}>Rooms</button>
             <button className={selectFlag === "Users" ? "selectFlag" : ""} 
                     onClick={() => {
-                      setContentPage(<UserPage/>);
+                      setContentPage(<UserPage userID={userID} userNo={userNo}/>);
                       setSelectFlag("Users");
                     }}>Users</button>
             <button className={selectFlag === "Friends" ? "selectFlag" : ""} 
@@ -29,7 +30,10 @@ const ContentsPage = () => {
                       setContentPage(<FriendsPage/>);
                       setSelectFlag("Friends");
                     }}>Friends</button>
-            <Link to={"/"}><button>Logout</button></Link>
+            <Link to={"/"} onClick={() => {
+                      removeCookie("chattingID");
+                      removeCookie("userNo");
+                    }}><button>Logout</button></Link>
           </div>
         </article>
         <article id="contentsArticle">
