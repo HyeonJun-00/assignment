@@ -5,6 +5,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 require('dotenv').config();
+const WebSocketServer = require("ws").Server;
+const wss = new WebSocketServer({ port: 10097 });
 const bodyParser = require('body-parser');
 const mysql = require('mysql2');
 const cors = require('cors');
@@ -16,6 +18,103 @@ app.use(cors({
     origin: true,
     credentials: true,
 }));
+class ChatClass {
+    constructor(initNumber) {
+        this._chattingRoomName = initNumber;
+        this._chatSaveList = [];
+        this._wsDictionary = {};
+    }
+    get roomNumber() {
+        return this._chattingRoomName;
+    }
+    get chatlist() {
+        return this._chatSaveList;
+    }
+    get users() {
+        return Object.keys(this._wsDictionary);
+    }
+    submitChat(chat) {
+        this._chatSaveList.push(chat);
+        console.log(JSON.stringify(chat));
+        if (this._chatSaveList.length > 100) {
+            this._chatSaveList.shift();
+        }
+        for (const user in this._wsDictionary) {
+            const chatList = { type: "chatList", data: this._chatSaveList };
+            this._wsDictionary[user].send(JSON.stringify(chatList));
+        }
+    }
+    sendUserList() {
+        for (const user in this._wsDictionary) {
+            this._wsDictionary[user].send(JSON.stringify({ type: "userList", room: this._chattingRoomName, data: Object.keys(this._wsDictionary) }));
+        }
+    }
+    userIn(userName, userWs) {
+        const chatList = { type: "chatList", data: this._chatSaveList };
+        userWs.send(JSON.stringify(chatList));
+        this._wsDictionary[userName] = userWs;
+        this.sendUserList();
+    }
+    userOut(userName) {
+        delete this._wsDictionary[userName];
+        this.sendUserList();
+    }
+}
+const chattingRoom = [new ChatClass(1), new ChatClass(2)];
+const allUser = {};
+wss.on("connection", (ws, req) => {
+    const sendPersonnel = () => {
+        const personnel = { type: "personnel", data: { room1: chattingRoom[0].users.length, room2: chattingRoom[1].users.length } };
+        for (const user in allUser) {
+            console.log(user);
+            allUser[user].send(JSON.stringify(personnel));
+        }
+    };
+    let userName = "";
+    ws.on("message", (message) => {
+        const chatData = JSON.parse(message);
+        switch (chatData.type) {
+            case "open":
+                userName = chatData.user;
+                allUser[userName] = ws;
+                sendPersonnel();
+                break;
+            case "userIn":
+                userName = chatData.user;
+                chattingRoom[chatData.room - 1].userIn(chatData.user, ws);
+                chattingRoom[chatData.room - 1].submitChat(chatData);
+                sendPersonnel();
+                break;
+            case "userOut":
+                chattingRoom[chatData.room - 1].userOut(chatData.user);
+                chattingRoom[chatData.room - 1].submitChat(chatData);
+                sendPersonnel();
+                break;
+            case "chat":
+                chattingRoom[chatData.room - 1].submitChat(chatData);
+                break;
+            default:
+                break;
+        }
+    });
+    ws.addEventListener("close", () => {
+        if (userName !== "") {
+            chattingRoom.forEach((chat, i) => {
+                chat.userOut(userName);
+                chat.submitChat({ type: "userOut", room: i - 1, user: userName });
+            });
+            delete allUser[userName];
+            sendPersonnel();
+        }
+    });
+});
+//--> chatting room start
+app.get(`/chatting/room`, (req, res) => {
+    const { roomNumber } = req.query;
+    res.send();
+    res.end();
+});
+//--< chatting room end
 //--> sign up page start
 app.get(`/id/check`, (req, res) => {
     const { userID } = req.query;

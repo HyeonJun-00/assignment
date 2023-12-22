@@ -10,7 +10,7 @@ const App = () => {
   const locationPathname = useLocation().pathname;
   const navigate = useNavigate();
 
-  console.log(cookies["userNo"]);
+  
   useEffect(() => {
     if (cookies["chattingID"] === undefined && locationPathname !== "/") {
       navigate("/", { replace: true });
