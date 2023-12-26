@@ -88,6 +88,7 @@ wss.on("connection", (ws: any, req: any) => {
     };
     const friendChatRoom:ChatClass[] = [];
     let userName = "";
+    let userNum = "";
 
     ws.on("message", (message: any) => {
         const chatData = JSON.parse(message);
@@ -95,28 +96,28 @@ wss.on("connection", (ws: any, req: any) => {
         console.log(friendChat);
          if (chatData.type === "friendChatOpen") {
             const [user1, user2] = [chatData.sender, chatData.recipient].sort((a, b) => a-b);
-            userName= chatData.sender;
+            userNum = chatData.sender;
             const friendChatName = `${user1}AND${user2}`;
 
             if (friendChat[friendChatName] === undefined) {
                 friendChat[friendChatName] = new ChatClass(friendChatName);
             }
-            if (!friendChat[friendChatName].users.reduce((bool, user) => bool || user === userName, false)) {
+            if (!friendChat[friendChatName].users.reduce((bool, user) => bool || user === userNum, false)) {
                 friendChatRoom.push(friendChat[friendChatName]);
-                friendChat[friendChatName].userIn(userName, ws);
+                friendChat[friendChatName].userIn(userNum, ws);
             }
             friendChat[friendChatName].sendChatList();
 
          }else if (chatData.type === "friendChat") {
             const [user1, user2] = [chatData.sender, chatData.recipient].sort((a, b) => a-b);
-            userName= chatData.sender;
+            userNum = chatData.sender;
             const friendChatName = `${user1}AND${user2}`;
             if (friendChat[friendChatName] === undefined) {
                 friendChat[friendChatName] = new ChatClass(friendChatName);
             }
-            if (!friendChat[friendChatName].users.reduce((bool, user) => bool || user === userName, false)) {
+            if (!friendChat[friendChatName].users.reduce((bool, user) => bool || user === userNum, false)) {
                 friendChatRoom.push(friendChat[friendChatName]);
-                friendChat[friendChatName].userIn(userName, ws);
+                friendChat[friendChatName].userIn(userNum, ws);
             }
             friendChat[friendChatName].submitChat(chatData);
         } else {
@@ -150,7 +151,7 @@ wss.on("connection", (ws: any, req: any) => {
                 chat.submitChat({ type: "userOut", room: i - 1, user: userName });
             });
             friendChatRoom.forEach((chat: ChatClass) => {
-                chat.userOut(userName);
+                chat.userOut(userNum);
             });
             delete allUser[userName];
             sendPersonnel();
